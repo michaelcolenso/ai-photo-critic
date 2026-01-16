@@ -1,0 +1,5 @@
+{
+  "name": "Photo Critic AI",
+  "description": "Upload a photo to receive a comprehensive analysis and rating from an AI-powered photo critic. Get feedback on composition, lighting, subject matter, and more to improve your photography skills.",
+  "requestFramePermissions": []
+}
