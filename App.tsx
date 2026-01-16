@@ -118,7 +118,16 @@ const App: React.FC = () => {
      
      try {
        const { mimeType, data } = await fileToBase64(selectedFile);
-       const improvedImageBase64 = await generateImprovedImage(data, mimeType, analysisResult);
+       
+       // Get original dimensions to intelligently determine aspect ratio
+       const dimensions = await new Promise<{width: number, height: number}>((resolve) => {
+           const img = new Image();
+           img.onload = () => resolve({ width: img.width, height: img.height });
+           img.onerror = () => resolve({ width: 1000, height: 1000 }); // Fallback
+           img.src = previewUrl || URL.createObjectURL(selectedFile);
+       });
+
+       const improvedImageBase64 = await generateImprovedImage(data, mimeType, analysisResult, dimensions.width, dimensions.height);
        setEditedImage(`data:image/png;base64,${improvedImageBase64}`);
      } catch (err: unknown) {
         console.error("Editing failed:", err);
@@ -247,10 +256,12 @@ const App: React.FC = () => {
                             <span className="text-xs text-emerald-500/80 uppercase font-bold tracking-wider ml-1">Projected</span>
                         </div>
                     </div>
-                    <p className="font-semibold text-indigo-300 mb-2">We will apply these specific fixes:</p>
+                    <p className="font-semibold text-indigo-300 mb-2">Technical Fixes to Apply:</p>
                     <ul className="list-disc pl-5 space-y-1">
-                        {analysisResult.suggested_edits.map((edit, idx) => (
-                            <li key={idx}>{edit}</li>
+                        {analysisResult.suggested_edits.map((item, idx) => (
+                            <li key={idx}>
+                                <span className="text-slate-200">{item.edit}</span>
+                            </li>
                         ))}
                     </ul>
                   </div>

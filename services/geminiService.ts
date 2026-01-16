@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { PhotoAnalysis } from '../types';
 
@@ -6,11 +7,11 @@ const analysisSchema = {
   properties: {
     rating: {
       type: Type.NUMBER,
-      description: "A numerical rating from 1 to 10, where 1 is poor and 10 is excellent.",
+      description: "A numerical rating from 1 to 10, where 1 is poor and 10 is excellent. Be critical and objective.",
     },
     projected_rating: {
       type: Type.NUMBER,
-      description: "The estimated numerical rating (1-10) the photo would achieve if the 3 suggested edits were applied successfully.",
+      description: "A realistic estimation of the new rating (1-10) after applying the suggested edits. Improvements typically result in a 0.5 to 2.0 point increase. Avoid inflating this score.",
     },
     composition: {
       type: Type.STRING,
@@ -30,9 +31,20 @@ const analysisSchema = {
     },
     suggested_edits: {
       type: Type.ARRAY,
-      description: "A list of exactly 3 highly specific, technical image editing instructions. Use precise terminology regarding contrast ratios, color temperature (e.g. 'warm to 5500K'), saturation, exposure compensation, and texture enhancement. Instructions should be directive and quantifiable where possible (e.g., 'Increase contrast', 'Boost shadows', 'Sharpen fine details').",
+      description: "A list of exactly 3 suggested edits. Each item must contain a technical instruction for the editor and a reason for the user.",
       items: {
-        type: Type.STRING,
+        type: Type.OBJECT,
+        properties: {
+            edit: {
+                type: Type.STRING,
+                description: "A precise, directive, and technical instruction for an AI image editor. Use professional terminology (e.g., 'Increase contrast by 15%', 'Warm white balance to 5600K', 'Apply radial gradient to darken corners', 'Sharpen high-frequency details'). Avoid vague language."
+            },
+            reason: {
+                type: Type.STRING,
+                description: "A concise explanation (1 sentence) of WHY this edit is necessary and how it improves the image (e.g., 'To separate the subject from the background', 'To fix the underexposure on the face')."
+            }
+        },
+        required: ['edit', 'reason']
       },
     },
   },
@@ -56,8 +68,14 @@ export const analyzeImage = async (base64ImageData: string, mimeType: string): P
   
   Analyze the image deeply. 
   1. For the detailed sections (Composition, Lighting, Subject), explain *why* elements are effective or ineffective using photographic terminology.
-  2. Provide exactly 3 specific, technical edits in the 'suggested_edits' list. Avoid vague advice. Instead, specify adjustments like 'Increase contrast to enhance dynamic range', 'Adjust white balance towards warmer tones', 'Sharpen texture in the subject', or 'Reduce highlight clipping'. These instructions will be used to programmatically generate an improved version of the image.
-  3. Estimate the 'projected_rating' if these specific edits were applied perfectly.
+  2. Provide exactly 3 specific, technical edits in the 'suggested_edits' list. 
+     - The 'edit' field must be a command suitable for a professional retoucher (e.g., "Increase exposure by 0.5 stops," "Boost vibrance in midtones").
+     - The 'reason' field should explain the aesthetic benefit to the user.
+  3. Calculate the 'projected_rating'. Be strictly realistic.
+     - Minor edits (e.g., slight contrast, saturation) usually increase the score by 0.5 - 1.0.
+     - Major fixes (e.g., saving underexposed subjects, fixing composition crops) can increase it by 1.5 - 2.5.
+     - Rarely project a 10/10 unless the starting image is already exceptional (9+).
+     - The projected score must be mathematically consistent (Rating + Improvement = Projected).
   
   Respond ONLY with a valid JSON object matching the provided schema.`;
   
@@ -99,23 +117,65 @@ export const analyzeImage = async (base64ImageData: string, mimeType: string): P
   }
 };
 
-export const generateImprovedImage = async (base64ImageData: string, mimeType: string, analysis: PhotoAnalysis): Promise<string> => {
+export const generateImprovedImage = async (
+  base64ImageData: string, 
+  mimeType: string, 
+  analysis: PhotoAnalysis,
+  originalWidth: number,
+  originalHeight: number
+): Promise<string> => {
   if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable not set");
   }
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const editInstructions = analysis.suggested_edits.map((edit, i) => `${i + 1}. ${edit}`).join('\n');
+  // Helper to determine aspect ratio based on original dimensions or explicit edit requests
+  const getBestAspectRatio = (w: number, h: number, edits: {edit: string}[]): string => {
+    const combinedEdits = edits.map(e => e.edit.toLowerCase()).join(' ');
+    
+    // 1. Check for explicit crop instructions
+    if (combinedEdits.includes("16:9")) return "16:9";
+    if (combinedEdits.includes("9:16")) return "9:16";
+    if (combinedEdits.includes("4:3")) return "4:3";
+    if (combinedEdits.includes("3:4")) return "3:4";
+    if (combinedEdits.includes("1:1") || combinedEdits.includes("square")) return "1:1";
+    
+    // 2. Fallback to matching the original image aspect ratio
+    const ratio = w / h;
+    const supported = [
+        { s: "1:1", v: 1 },
+        { s: "3:4", v: 0.75 },
+        { s: "4:3", v: 1.3333 },
+        { s: "9:16", v: 0.5625 },
+        { s: "16:9", v: 1.7778 }
+    ];
+    
+    // Find the supported aspect ratio that is numerically closest to the original
+    return supported.reduce((prev, curr) => 
+        Math.abs(curr.v - ratio) < Math.abs(prev.v - ratio) ? curr : prev
+    ).s;
+  };
 
-  const prompt = `Act as a professional photo editor. I have a photo that needs improvement. 
+  const targetAspectRatio = getBestAspectRatio(originalWidth, originalHeight, analysis.suggested_edits);
+
+  // Extract just the technical instructions
+  const editInstructions = analysis.suggested_edits.map((item, i) => `${i + 1}. ${item.edit}`).join('\n');
+
+  const prompt = `Act as an expert high-end photo retoucher. You are given an original photo and a set of specific technical instructions.
   
-  Please apply the following specific edits to the image:
+  Your goal is to significantly elevate the quality of this image to professional standards, aiming to increase its aesthetic rating from ${analysis.rating}/10 to ${analysis.projected_rating}/10.
+
+  STRICTLY APPLY THESE EDITS:
   ${editInstructions}
   
-  Also consider the general critique:
-  "${analysis.overall_comment}"
+  ADDITIONAL GUIDELINES:
+  - Maintain the original subject identity.
+  - Follow any crop or composition changes specified in the edits. If none are specified, preserve the original composition structure.
+  - Apply professional color grading, contrast balancing, and texture enhancement.
+  - Ensure the final result looks photorealistic and polished, not over-processed.
+  - Context from critique: "${analysis.overall_comment}"
   
-  Maintain the original subject and context, but apply these specific changes to create a high-quality professional result.`;
+  Return the improved image.`;
 
   const imagePart = {
     inlineData: {
@@ -135,7 +195,7 @@ export const generateImprovedImage = async (base64ImageData: string, mimeType: s
       },
       config: {
         imageConfig: {
-            aspectRatio: "1:1",
+            aspectRatio: targetAspectRatio,
         }
       },
     });

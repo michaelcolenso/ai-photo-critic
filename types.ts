@@ -1,4 +1,9 @@
 
+export interface SuggestedEdit {
+  edit: string;
+  reason: string;
+}
+
 export interface PhotoAnalysis {
   rating: number;
   projected_rating: number;
@@ -6,5 +11,5 @@ export interface PhotoAnalysis {
   lighting: string;
   subject: string;
   overall_comment: string;
-  suggested_edits: string[];
+  suggested_edits: SuggestedEdit[];
 }
