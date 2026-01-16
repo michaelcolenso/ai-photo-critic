@@ -1,6 +1,7 @@
 
 export interface PhotoAnalysis {
   rating: number;
+  projected_rating: number;
   composition: string;
   lighting: string;
   subject: string;

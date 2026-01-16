@@ -9,6 +9,10 @@ const analysisSchema = {
       type: Type.NUMBER,
       description: "A numerical rating from 1 to 10, where 1 is poor and 10 is excellent.",
     },
+    projected_rating: {
+      type: Type.NUMBER,
+      description: "The estimated numerical rating (1-10) the photo would achieve if the 3 suggested edits were applied successfully.",
+    },
     composition: {
       type: Type.STRING,
       description: "A detailed critique of the composition. Discuss framing, rule of thirds, leading lines, balance, symmetry, negative space, and perspective. Explain what works well and suggest specific improvements for better visual flow.",
@@ -33,7 +37,7 @@ const analysisSchema = {
       },
     },
   },
-  required: ['rating', 'composition', 'lighting', 'subject', 'overall_comment', 'suggested_edits'],
+  required: ['rating', 'projected_rating', 'composition', 'lighting', 'subject', 'overall_comment', 'suggested_edits'],
 };
 
 export const analyzeImage = async (base64ImageData: string, mimeType: string): Promise<PhotoAnalysis> => {
@@ -54,6 +58,7 @@ export const analyzeImage = async (base64ImageData: string, mimeType: string): P
   Analyze the image deeply. 
   1. For the detailed sections (Composition, Lighting, Subject), explain *why* elements are effective or ineffective using photographic terminology.
   2. Provide exactly 3 specific, actionable edits in the 'suggested_edits' list. These should be clear instructions that could be passed to a photo editor (human or AI) to instantly make the photo better.
+  3. Estimate the 'projected_rating' if these specific edits were applied perfectly.
   
   Respond ONLY with a valid JSON object matching the provided schema.`;
   
@@ -77,6 +82,7 @@ export const analyzeImage = async (base64ImageData: string, mimeType: string): P
     // Type validation
     if (
       typeof parsedJson.rating !== 'number' ||
+      typeof parsedJson.projected_rating !== 'number' ||
       typeof parsedJson.composition !== 'string' ||
       typeof parsedJson.lighting !== 'string' ||
       typeof parsedJson.subject !== 'string' ||

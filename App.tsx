@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { PhotoAnalysis } from './types';
 import { analyzeImage, generateImprovedImage } from './services/geminiService';
@@ -235,6 +236,17 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="bg-slate-700/50 rounded p-4 mb-4 text-sm text-slate-300">
+                     <div className="flex items-center justify-between border-b border-slate-600 pb-3 mb-3">
+                        <div className="text-slate-400 font-medium">Potential Score Boost</div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-slate-300 font-bold">{analysisResult.rating}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                            <span className="text-emerald-400 font-bold text-lg">{analysisResult.projected_rating}</span>
+                            <span className="text-xs text-emerald-500/80 uppercase font-bold tracking-wider ml-1">Projected</span>
+                        </div>
+                    </div>
                     <p className="font-semibold text-indigo-300 mb-2">We will apply these specific fixes:</p>
                     <ul className="list-disc pl-5 space-y-1">
                         {analysisResult.suggested_edits.map((edit, idx) => (
