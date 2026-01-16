@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { PhotoAnalysis } from '../types';
 
@@ -31,7 +30,7 @@ const analysisSchema = {
     },
     suggested_edits: {
       type: Type.ARRAY,
-      description: "A list of exactly 3 specific, short, and actionable image editing instructions that an AI editor could perform to improve the photo (e.g., 'Increase contrast in the sky', 'Blur the background slightly', 'Brighten the subject face').",
+      description: "A list of exactly 3 highly specific, technical image editing instructions. Use precise terminology regarding contrast ratios, color temperature (e.g. 'warm to 5500K'), saturation, exposure compensation, and texture enhancement. Instructions should be directive and quantifiable where possible (e.g., 'Increase contrast', 'Boost shadows', 'Sharpen fine details').",
       items: {
         type: Type.STRING,
       },
@@ -57,7 +56,7 @@ export const analyzeImage = async (base64ImageData: string, mimeType: string): P
   
   Analyze the image deeply. 
   1. For the detailed sections (Composition, Lighting, Subject), explain *why* elements are effective or ineffective using photographic terminology.
-  2. Provide exactly 3 specific, actionable edits in the 'suggested_edits' list. These should be clear instructions that could be passed to a photo editor (human or AI) to instantly make the photo better.
+  2. Provide exactly 3 specific, technical edits in the 'suggested_edits' list. Avoid vague advice. Instead, specify adjustments like 'Increase contrast to enhance dynamic range', 'Adjust white balance towards warmer tones', 'Sharpen texture in the subject', or 'Reduce highlight clipping'. These instructions will be used to programmatically generate an improved version of the image.
   3. Estimate the 'projected_rating' if these specific edits were applied perfectly.
   
   Respond ONLY with a valid JSON object matching the provided schema.`;
